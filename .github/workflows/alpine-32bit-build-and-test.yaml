@@ -5,37 +5,42 @@ on:
     - cron: '0 20 * * *'
   push:
     branches:
-      - prerelease_test
+      - arm_test
   pull_request:
 jobs:
   regress_linux_32bit:
     name: PG${{ matrix.pg }} ${{ matrix.build_type }} linux-i386
     runs-on: ubuntu-18.04
     container:
-      image: i386/postgres:${{ matrix.pg }}-alpine
+      image: i386/postgres:${{ matrix.pg }}
       env:
         POSTGRES_HOST_AUTH_METHOD: trust
     strategy:
       fail-fast: false
       matrix:
-        pg: [ "11.11", "12.6", "13.2" ]
+        pg: [ "13.2" ]
+#        pg: [ "11.11", "12.6", "13.2" ]
         build_type: [ Debug ]
-        include:
-          - pg: 11.11
-            ignores: append-11 chunk_adaptive-11 continuous_aggs_bgw_drop_chunks remote_txn transparent_decompression-11 continuous_aggs_insert continuous_aggs_multi continuous_aggs_concurrent_refresh
-          - pg: 12.6
-            ignores: append-12 chunk_adaptive-12 continuous_aggs_bgw_drop_chunks remote_txn transparent_decompression-12
-          - pg: 13.2
-            ignores: append-13 chunk_adaptive-13 remote_txn transparent_decompression-13 vacuum_parallel
+#        include:
+#          - pg: 11.11
+#            ignores: append-11 chunk_adaptive-11 continuous_aggs_bgw_drop_chunks remote_txn transparent_decompression-11 continuous_aggs_insert continuous_aggs_multi continuous_aggs_concurrent_refresh
+#          - pg: 12.6
+#            ignores: append-12 chunk_adaptive-12 continuous_aggs_bgw_drop_chunks remote_txn transparent_decompression-12
+#          - pg: 13.2
+#            ignores: append-13 chunk_adaptive-13 remote_txn transparent_decompression-13 vacuum_parallel
 
     steps:
 
     - name: Install build dependencies
       run: |
-        apk add --no-cache --virtual .build-deps coreutils dpkg-dev findutils gcc libc-dev make util-linux-dev diffutils cmake openssl-dev sudo flex bison git
+        apt update
+        apt install -y bzip2 cmake gcc libssl-dev systemd-coredump wget
 
     - name: Build pg_isolation_regress
       run: |
+        id
+        pwd
+        echo ~
         wget -q -O postgresql.tar.bz2 https://ftp.postgresql.org/pub/source/v${{ matrix.pg }}/postgresql-${{ matrix.pg }}.tar.bz2
         mkdir -p ~/postgresql
         tar --extract --file postgresql.tar.bz2 --directory ~/postgresql --strip-components 1
@@ -43,51 +48,53 @@ jobs:
         ./configure --prefix=/usr/local --enable-debug --enable-cassert --with-openssl --without-readline --without-zlib
         make -C src/test/isolation
         chown -R postgres:postgres ~/postgresql
+        find / -name pg_config.h
+        ls ~/postgresql/src/include/pg_config.h
 
     - name: Checkout TimescaleDB
       uses: actions/checkout@v1
 
     - name: Build TimescaleDB
       run: |
-        ./bootstrap -DCMAKE_BUILD_TYPE="${{ matrix.build_type }}" -DPG_SOURCE_DIR=~/postgresql
+        ./bootstrap -DCMAKE_BUILD_TYPE="${{ matrix.build_type }}" -DPG_SOURCE_DIR=/github/home/postgresql
         make -C build install
         chown -R postgres:postgres .
 
-    - name: make installcheck
-      id: installcheck
-      run: |
-        set -o pipefail
-        sudo -u postgres make -k -C build installcheck IGNORES="${{ matrix.ignores }}" | tee installcheck.log
-
-    - name: Show regression diffs
-      if: always()
-      id: collectlogs
-      run: |
-        find . -name regression.diffs -exec cat {} + > regression.log
-        find . -name postmaster.log -exec cat {} + > postgres.log
-        grep -e 'FAILED' -e 'failed (ignored)' installcheck.log || true
-        cat regression.log
-
-    - name: Save regression diffs
-      if: always()
-      uses: actions/upload-artifact@v1
-      with:
-        name: Regression diff ${{ matrix.pg }}
-        path: regression.log
-
-    - name: Save postmaster.log
-      if: always()
-      uses: actions/upload-artifact@v1
-      with:
-        name: PostgreSQL log ${{ matrix.pg }}
-        path: postgres.log
-
-    - name: Slack Notification
-      if: failure()
-      env:
-        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-        SLACK_COLOR: '#ff0000'
-        SLACK_USERNAME: GitHub Action
-        SLACK_TITLE: Regression 32-bit PG${{ matrix.pg }} ${{ job.status }}
-        SLACK_MESSAGE: ${{ github.event.head_commit.message }}
-      uses: rtCamp/action-slack-notify@v2.0.2
+#    - name: make installcheck
+#      id: installcheck
+#      run: |
+#        set -o pipefail
+#        sudo -u postgres make -k -C build installcheck IGNORES="${{ matrix.ignores }}" | tee installcheck.log
+#
+#    - name: Show regression diffs
+#      if: always()
+#      id: collectlogs
+#      run: |
+#        find . -name regression.diffs -exec cat {} + > regression.log
+#        find . -name postmaster.log -exec cat {} + > postgres.log
+#        grep -e 'FAILED' -e 'failed (ignored)' installcheck.log || true
+#        cat regression.log
+#
+#    - name: Save regression diffs
+#      if: always()
+#      uses: actions/upload-artifact@v1
+#      with:
+#        name: Regression diff ${{ matrix.pg }}
+#        path: regression.log
+#
+#    - name: Save postmaster.log
+#      if: always()
+#      uses: actions/upload-artifact@v1
+#      with:
+#        name: PostgreSQL log ${{ matrix.pg }}
+#        path: postgres.log
+#
+#    - name: Slack Notification
+#      if: failure()
+#      env:
+#        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+#        SLACK_COLOR: '#ff0000'
+#        SLACK_USERNAME: GitHub Action
+#        SLACK_TITLE: Regression 32-bit PG${{ matrix.pg }} ${{ job.status }}
+#        SLACK_MESSAGE: ${{ github.event.head_commit.message }}
+#      uses: rtCamp/action-slack-notify@v2.0.2
