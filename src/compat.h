@@ -169,6 +169,15 @@ get_estate_resultrelinfo(EState *estate)
 #endif
 }
 
+/* PG14 splits Copy code into separate code for COPY FROM and COPY TO
+ * since we were only interested in the COPY FROM parts we macro CopyState
+ * to CopyFromState for PG14
+ * https://github.com/postgres/postgres/commit/c532d15ddd
+ */
+#if PG14_GE
+#define CopyState CopyFromState
+#endif
+
 /* PG13 added a dstlen parameter to pg_b64_decode and pg_b64_encode */
 #if PG13_LT
 #define pg_b64_encode_compat(src, srclen, dst, dstlen) pg_b64_encode((src), (srclen), (dst))

@@ -679,6 +679,9 @@ timescaledb_DoCopy(const CopyStmt *stmt, const char *queryString, uint64 *proces
 
 	cstate = BeginCopyFrom(pstate,
 						   rel,
+#if PG14_GE
+						   NULL,
+#endif
 						   stmt->filename,
 						   stmt->is_program,
 						   NULL,
