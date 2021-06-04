@@ -276,6 +276,71 @@ get_estate_resultrelinfo(EState *estate)
 	get_agg_clause_costs(root, split, costs)
 #endif
 
+/* PG14 removes partitioned_rels from create_append_path and create_merge_append_path
+ *
+ * https://github.com/postgres/postgres/commit/f003a7522b
+ */
+#if PG14_LT
+#define create_append_path_compat(root,                                                            \
+								  rel,                                                             \
+								  subpaths,                                                        \
+								  partial_subpaths,                                                \
+								  pathkeys,                                                        \
+								  required_outer,                                                  \
+								  parallel_worker,                                                 \
+								  parallel_aware,                                                  \
+								  partitioned_rels,                                                \
+								  rows)                                                            \
+	create_append_path(root,                                                                       \
+					   rel,                                                                        \
+					   subpaths,                                                                   \
+					   partial_subpaths,                                                           \
+					   pathkeys,                                                                   \
+					   required_outer,                                                             \
+					   parallel_worker,                                                            \
+					   parallel_aware,                                                             \
+					   partitioned_rels,                                                           \
+					   rows)
+#else
+#define create_append_path_compat(root,                                                            \
+								  rel,                                                             \
+								  subpaths,                                                        \
+								  partial_subpaths,                                                \
+								  pathkeys,                                                        \
+								  required_outer,                                                  \
+								  parallel_worker,                                                 \
+								  parallel_aware,                                                  \
+								  partitioned_rels,                                                \
+								  rows)                                                            \
+	create_append_path(root,                                                                       \
+					   rel,                                                                        \
+					   subpaths,                                                                   \
+					   partial_subpaths,                                                           \
+					   pathkeys,                                                                   \
+					   required_outer,                                                             \
+					   parallel_worker,                                                            \
+					   parallel_aware,                                                             \
+					   rows)
+#endif
+
+#if PG14_LT
+#define create_merge_append_path_compat(root,                                                      \
+										rel,                                                       \
+										subpaths,                                                  \
+										pathkeys,                                                  \
+										required_outer,                                            \
+										partitioned_rels)                                          \
+	create_merge_append_path(root, rel, subpaths, pathkeys, required_outer, partitioned_rels)
+#else
+#define create_merge_append_path_compat(root,                                                      \
+										rel,                                                       \
+										subpaths,                                                  \
+										pathkeys,                                                  \
+										required_outer,                                            \
+										partitioned_rels)                                          \
+	create_merge_append_path(root, rel, subpaths, pathkeys, required_outer)
+#endif
+
 /* PG14 adds PlannerInfo as argument to make_restrictinfo, make_simple_restrictinfo and pull_varnos
  *
  * https://github.com/postgres/postgres/commit/55dc86eca7
