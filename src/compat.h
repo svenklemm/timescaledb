@@ -7,6 +7,7 @@
 #define TIMESCALEDB_COMPAT_H
 
 #include <postgres.h>
+#include <commands/cluster.h>
 #include <commands/explain.h>
 #include <commands/trigger.h>
 #include <executor/executor.h>
@@ -156,6 +157,43 @@ get_vacuum_options(const VacuumStmt *stmt)
 
 	return (stmt->is_vacuumcmd ? VACOPT_VACUUM : VACOPT_ANALYZE) | (verbose ? VACOPT_VERBOSE : 0) |
 		   (analyze ? VACOPT_ANALYZE : 0);
+}
+
+static inline int
+get_cluster_options(const ClusterStmt *stmt)
+{
+#if PG14_LT
+	return stmt->options;
+#else
+	ListCell *lc;
+	bool verbose = false;
+
+	/* Parse option list */
+	foreach (lc, stmt->params)
+	{
+		DefElem *opt = (DefElem *) lfirst(lc);
+
+		if (strcmp(opt->defname, "verbose") == 0)
+			verbose = defGetBoolean(opt);
+		else
+			ereport(ERROR,
+					(errcode(ERRCODE_SYNTAX_ERROR),
+					 errmsg("unrecognized CLUSTER option \"%s\"", opt->defname),
+					 parser_errposition(NULL, opt->location)));
+	}
+
+	return verbose ? CLUOPT_VERBOSE : 0;
+#endif
+}
+
+static inline int
+get_reindex_options(ReindexStmt *stmt)
+{
+#if PG14_LT
+	return stmt->options;
+#else
+	return ReindexParseOptions(NULL, stmt);
+#endif
 }
 
 static inline ResultRelInfo *

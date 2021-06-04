@@ -1489,12 +1489,11 @@ reindex_chunk(Hypertable *ht, Oid chunk_relid, void *arg)
 			stmt->relation->relname = NameStr(chunk->fd.table_name);
 			stmt->relation->schemaname = NameStr(chunk->fd.schema_name);
 			ReindexTable(stmt->relation,
-						 stmt->options
+						 get_reindex_options(stmt),
+
 #if PG14_LT
-						 ,
 						 stmt->concurrent /* should test for deadlocks */
 #elif PG14_GE
-						 ,
 						 false /* isTopLevel */
 #endif
 			);
@@ -1543,7 +1542,7 @@ process_reindex(ProcessUtilityArgs *args)
 #if PG14_LT
 				if (stmt->concurrent)
 #else
-				if (stmt->options & REINDEXOPT_CONCURRENTLY)
+				if (get_reindex_options(stmt) & REINDEXOPT_CONCURRENTLY)
 #endif
 					ereport(ERROR,
 							(errmsg("concurrent index creation on hypertables is not supported")));
@@ -2629,7 +2628,7 @@ process_cluster_start(ProcessUtilityArgs *args)
 			 * Since we keep OIDs between transactions, there is a potential
 			 * issue if an OID gets reassigned between two subtransactions
 			 */
-			cluster_rel(cim->chunkoid, cim->indexoid, stmt->options);
+			cluster_rel(cim->chunkoid, cim->indexoid, get_cluster_options(stmt));
 			PopActiveSnapshot();
 			CommitTransactionCommand();
 		}
@@ -3321,7 +3320,7 @@ process_altertable_end_subcmd(Hypertable *ht, Node *parsetree, ObjectAddress *ob
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("hypertables do not support inheritance")));
 #if PG14_GE
-    case AT_AlterCollationRefreshVersion:
+		case AT_AlterCollationRefreshVersion:
 #endif
 		case AT_SetStatistics:
 		case AT_SetLogged:
