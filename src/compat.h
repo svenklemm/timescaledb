@@ -76,11 +76,23 @@
 #endif
 
 #if PG14_LT
-#define ExecInsertIndexTuplesCompat(rri, slot, estate, noDupErr, specConflict, arbiterIndexes)     \
+#define ExecInsertIndexTuplesCompat(rri,                                                           \
+									slot,                                                          \
+									estate,                                                        \
+									update,                                                        \
+									noDupErr,                                                      \
+									specConflict,                                                  \
+									arbiterIndexes)                                                \
 	ExecInsertIndexTuples(slot, estate, noDupErr, specConflict, arbiterIndexes)
 #else
-#define ExecInsertIndexTuplesCompat(rri, slot, estate, noDupErr, specConflict, arbiterIndexes)     \
-	ExecInsertIndexTuples(rri, slot, estate, noDupErr, specConflict, arbiterIndexes)
+#define ExecInsertIndexTuplesCompat(rri,                                                           \
+									slot,                                                          \
+									estate,                                                        \
+									update,                                                        \
+									noDupErr,                                                      \
+									specConflict,                                                  \
+									arbiterIndexes)                                                \
+	ExecInsertIndexTuples(rri, slot, estate, update, noDupErr, specConflict, arbiterIndexes)
 #endif
 
 #define TTSOpsVirtualP (&TTSOpsVirtual)

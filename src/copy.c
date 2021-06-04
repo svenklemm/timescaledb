@@ -405,6 +405,7 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 																 compress_slot,
 																 estate,
 																 false,
+																 false,
 																 NULL,
 																 NIL);
 			}
@@ -421,6 +422,7 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 					recheckIndexes = ExecInsertIndexTuplesCompat(resultRelInfo,
 																 myslot,
 																 estate,
+																 false,
 																 false,
 																 NULL,
 																 NIL);
