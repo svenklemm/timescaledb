@@ -276,6 +276,61 @@ get_estate_resultrelinfo(EState *estate)
 	get_agg_clause_costs(root, split, costs)
 #endif
 
+/* PG14 adds PlannerInfo as argument to make_restrictinfo, make_simple_restrictinfo and pull_varnos
+ *
+ * https://github.com/postgres/postgres/commit/55dc86eca7
+ */
+#if PG14_LT
+#define make_restrictinfo_compat(root,                                                             \
+								 clause,                                                           \
+								 is_pushed_down,                                                   \
+								 outerjoin_delayed,                                                \
+								 pseudoconstant,                                                   \
+								 security_level,                                                   \
+								 required_relids,                                                  \
+								 outer_relids,                                                     \
+								 nullable_relids)                                                  \
+	make_restrictinfo(clause,                                                                      \
+					  is_pushed_down,                                                              \
+					  outerjoin_delayed,                                                           \
+					  pseudoconstant,                                                              \
+					  security_level,                                                              \
+					  required_relids,                                                             \
+					  outer_relids,                                                                \
+					  nullable_relids)
+#else
+#define make_restrictinfo_compat(root,                                                             \
+								 clause,                                                           \
+								 is_pushed_down,                                                   \
+								 outerjoin_delayed,                                                \
+								 pseudoconstant,                                                   \
+								 security_level,                                                   \
+								 required_relids,                                                  \
+								 outer_relids,                                                     \
+								 nullable_relids)                                                  \
+	make_restrictinfo(root,                                                                        \
+					  clause,                                                                      \
+					  is_pushed_down,                                                              \
+					  outerjoin_delayed,                                                           \
+					  pseudoconstant,                                                              \
+					  security_level,                                                              \
+					  required_relids,                                                             \
+					  outer_relids,                                                                \
+					  nullable_relids)
+#endif
+
+#if PG14_LT
+#define make_simple_restrictinfo_compat(root, clause) make_simple_restrictinfo(clause)
+#else
+#define make_simple_restrictinfo_compat(root, clause) make_simple_restrictinfo(root, clause)
+#endif
+
+#if PG14_LT
+#define pull_varnos_compat(root, expr) pull_varnos(expr)
+#else
+#define pull_varnos_compat(root, expr) pull_varnos(root, expr)
+#endif
+
 /* PG13 added a dstlen parameter to pg_b64_decode and pg_b64_encode */
 #if PG13_LT
 #define pg_b64_encode_compat(src, srclen, dst, dstlen) pg_b64_encode((src), (srclen), (dst))
