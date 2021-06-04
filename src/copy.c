@@ -230,13 +230,16 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 	 * above zero. See `rt_fetch` in parsetree.h.
 	 */
 	resultRelInfo = makeNode(ResultRelInfo);
-
+#if PG14_LT
 	InitResultRelInfo(resultRelInfo,
 					  ccstate->rel,
 					  /* RangeTableIndex */ 1,
 					  NULL,
 					  0);
-
+#else
+	ExecInitRangeTable(estate, range_table);
+	ExecInitResultRelation(estate, resultRelInfo, 1);
+#endif
 	CheckValidResultRel(resultRelInfo, CMD_INSERT);
 
 	ExecOpenIndices(resultRelInfo, false);
@@ -244,11 +247,16 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 #if PG14_LT
 	estate->es_result_relations = resultRelInfo;
 	estate->es_num_result_relations = 1;
-#endif
 	estate->es_result_relation_info = resultRelInfo;
 	estate->es_range_table = range_table;
+#endif
 
+#if PG14_LT
 	ExecInitRangeTable(estate, estate->es_range_table);
+#endif
+
+	if (!ccstate->dispatch->hypertable_result_rel_info)
+		ccstate->dispatch->hypertable_result_rel_info = resultRelInfo;
 
 	singleslot = table_slot_create(resultRelInfo->ri_RelationDesc, &estate->es_tupleTable);
 
@@ -308,8 +316,8 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 		point = ts_hyperspace_calculate_point(ht->space, myslot);
 
 		/* Save the main table's (hypertable's) ResultRelInfo */
-		if (NULL == dispatch->hypertable_result_rel_info)
-			dispatch->hypertable_result_rel_info = estate->es_result_relation_info;
+		if (!dispatch->hypertable_result_rel_info)
+			dispatch->hypertable_result_rel_info = saved_resultRelInfo;
 
 		/* Find or create the insert state matching the point */
 		cis = ts_chunk_dispatch_get_chunk_insert_state(dispatch,
@@ -340,7 +348,9 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 		 */
 		saved_resultRelInfo = resultRelInfo;
 		resultRelInfo = cis->result_relation_info;
+#if PG14_LT
 		estate->es_result_relation_info = resultRelInfo;
+#endif
 
 		if (cis->compress_state != NULL)
 			check_resultRelInfo = cis->orig_result_relation_info;
@@ -369,11 +379,7 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 			/* Compute stored generated columns */
 			if (check_resultRelInfo->ri_RelationDesc->rd_att->constr &&
 				check_resultRelInfo->ri_RelationDesc->rd_att->constr->has_generated_stored)
-#if PG13_GE
-				ExecComputeStoredGenerated(estate, myslot, CMD_INSERT);
-#else
-				ExecComputeStoredGenerated(estate, myslot);
-#endif
+				ExecComputeStoredGeneratedCompat(check_resultRelInfo, estate, myslot, CMD_INSERT);
 			/*
 			 * If the target is a plain table, check the constraints of
 			 * the tuple.
@@ -395,7 +401,12 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 								   ti_options,
 								   bistate);
 				if (resultRelInfo->ri_NumIndices > 0)
-					recheckIndexes = ExecInsertIndexTuples(compress_slot, estate, false, NULL, NIL);
+					recheckIndexes = ExecInsertIndexTuplesCompat(resultRelInfo,
+																 compress_slot,
+																 estate,
+																 false,
+																 NULL,
+																 NIL);
 			}
 			else
 			{
@@ -407,7 +418,12 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 								   bistate);
 
 				if (resultRelInfo->ri_NumIndices > 0)
-					recheckIndexes = ExecInsertIndexTuples(myslot, estate, false, NULL, NIL);
+					recheckIndexes = ExecInsertIndexTuplesCompat(resultRelInfo,
+																 myslot,
+																 estate,
+																 false,
+																 NULL,
+																 NIL);
 			}
 
 			/* AFTER ROW INSERT Triggers */
@@ -428,10 +444,14 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 		}
 
 		resultRelInfo = saved_resultRelInfo;
+#if PG14_LT
 		estate->es_result_relation_info = resultRelInfo;
+#endif
 	}
 
+#if PG14_LT
 	estate->es_result_relation_info = ccstate->dispatch->hypertable_result_rel_info;
+#endif
 
 	/* Done, clean up */
 	if (errcallback.previous)
@@ -449,7 +469,10 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 
 	ExecResetTupleTable(estate->es_tupleTable, false);
 
+#if PG14_LT
 	ExecCloseIndices(resultRelInfo);
+#endif
+
 	/* Close any trigger target relations */
 #if PG14_LT
 	ExecCleanUpTriggerState(estate);

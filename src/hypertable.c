@@ -1504,6 +1504,7 @@ ts_hypertable_insert_blocker(PG_FUNCTION_ARGS)
 	if (!CALLED_AS_TRIGGER(fcinfo))
 		elog(ERROR, "insert_blocker: not called by trigger manager");
 
+	abort();
 	if (ts_guc_restoring)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),

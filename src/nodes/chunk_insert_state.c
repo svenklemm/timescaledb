@@ -86,21 +86,32 @@ static inline ResultRelInfo *
 create_chunk_result_relation_info(ChunkDispatch *dispatch, Relation rel)
 {
 	ResultRelInfo *rri, *rri_orig;
-	Index hyper_rti = dispatch->hypertable_result_rel_info->ri_RangeTableIndex;
+	Index hyper_rti = 1; // dispatch->hypertable_result_rel_info->ri_RangeTableIndex;
 	rri = palloc0(sizeof(ResultRelInfo));
 	NodeSetTag(rri, T_ResultRelInfo);
+
+	if (dispatch->dispatch_state)
+	{
+		rri_orig = dispatch->dispatch_state->mtstate->resultRelInfo;
+		hyper_rti = rri_orig->ri_RangeTableIndex;
+	}
+	else
+	{
+		hyper_rti = 1;
+		rri_orig = dispatch->estate->es_result_relations[0];
+	}
+	dispatch->hypertable_result_rel_info = rri_orig;
 
 	InitResultRelInfo(rri, rel, hyper_rti, NULL, dispatch->estate->es_instrument);
 
 	/* Copy options from the main table's (hypertable's) result relation info */
-	rri_orig = dispatch->hypertable_result_rel_info;
 	rri->ri_WithCheckOptions = rri_orig->ri_WithCheckOptions;
 	rri->ri_WithCheckOptionExprs = rri_orig->ri_WithCheckOptionExprs;
 	rri->ri_junkFilter = rri_orig->ri_junkFilter;
 	rri->ri_projectReturning = rri_orig->ri_projectReturning;
 
 	rri->ri_FdwState = NULL;
-	rri->ri_usesFdwDirectModify = dispatch->hypertable_result_rel_info->ri_usesFdwDirectModify;
+	rri->ri_usesFdwDirectModify = rri_orig->ri_usesFdwDirectModify;
 
 	if (RelationGetForm(rel)->relkind == RELKIND_FOREIGN_TABLE)
 		rri->ri_FdwRoutine = GetFdwRoutineForRelation(rel, true);
@@ -719,6 +730,8 @@ ts_chunk_insert_state_create(const Chunk *chunk, ChunkDispatch *dispatch)
 													  dispatch->eflags);
 	}
 
+	if (dispatch->dispatch_state)
+		dispatch->dispatch_state->mtstate->resultRelInfo = resrelinfo;
 	MemoryContextSwitchTo(old_mcxt);
 
 	return state;

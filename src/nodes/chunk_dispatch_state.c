@@ -89,9 +89,11 @@ chunk_dispatch_exec(CustomScanState *node)
 	/* Save the main table's (hypertable's) ResultRelInfo */
 	if (NULL == dispatch->hypertable_result_rel_info)
 	{
+#if PG14_LT
 		Assert(RelationGetRelid(estate->es_result_relation_info->ri_RelationDesc) ==
 			   state->hypertable_relid);
-		dispatch->hypertable_result_rel_info = estate->es_result_relation_info;
+#endif
+		dispatch->hypertable_result_rel_info = estate->es_result_relations[0];
 	}
 
 	/* Find or create the insert state matching the point */
@@ -107,10 +109,12 @@ chunk_dispatch_exec(CustomScanState *node)
 	 * the es_result_relation_info this has to be updated every time, not
 	 * just when the chunk changes.
 	 */
+#if PG14_LT
 	if (cis->compress_state != NULL)
 		estate->es_result_relation_info = cis->orig_result_relation_info;
 	else
 		estate->es_result_relation_info = cis->result_relation_info;
+#endif
 
 	MemoryContextSwitchTo(old);
 
@@ -136,15 +140,23 @@ chunk_dispatch_exec(CustomScanState *node)
 		}
 
 		if (cis->rel->rd_att->constr && cis->rel->rd_att->constr->has_generated_stored)
-			ExecComputeStoredGeneratedCompat(estate, slot, CMD_INSERT);
+			ExecComputeStoredGeneratedCompat(cis->orig_result_relation_info,
+											 estate,
+											 slot,
+											 CMD_INSERT);
 
 		if (cis->rel->rd_att->constr)
 			ExecConstraints(cis->orig_result_relation_info, slot, estate);
 
+#if PG14_LT
 		estate->es_result_relation_info = cis->result_relation_info;
+#endif
 		Assert(ts_cm_functions->compress_row_exec != NULL);
 		slot = ts_cm_functions->compress_row_exec(cis->compress_state, slot);
 	}
+
+	state->mtstate->resultRelInfo = cis->result_relation_info;
+
 	return slot;
 }
 

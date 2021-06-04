@@ -63,12 +63,23 @@
  * behavior of the new version we simply adopt the new version's name.
  */
 
-#if PG13_GE
-#define ExecComputeStoredGeneratedCompat(estate, slot, cmd_type)                                   \
+#if PG14_GE
+#define ExecComputeStoredGeneratedCompat(rri, estate, slot, cmd_type)                              \
+	ExecComputeStoredGenerated(rri, estate, slot, cmd_type)
+#elif PG13
+#define ExecComputeStoredGeneratedCompat(rri, estate, slot, cmd_type)                              \
 	ExecComputeStoredGenerated(estate, slot, cmd_type)
 #else
-#define ExecComputeStoredGeneratedCompat(estate, slot, cmd_type)                                   \
+#define ExecComputeStoredGeneratedCompat(rri, estate, slot, cmd_type)                              \
 	ExecComputeStoredGenerated(estate, slot)
+#endif
+
+#if PG14_LT
+#define ExecInsertIndexTuplesCompat(rri, slot, estate, noDupErr, specConflict, arbiterIndexes)     \
+	ExecInsertIndexTuples(slot, estate, noDupErr, specConflict, arbiterIndexes)
+#else
+#define ExecInsertIndexTuplesCompat(rri, slot, estate, noDupErr, specConflict, arbiterIndexes)     \
+	ExecInsertIndexTuples(rri, slot, estate, noDupErr, specConflict, arbiterIndexes)
 #endif
 
 #define TTSOpsVirtualP (&TTSOpsVirtual)
@@ -145,6 +156,17 @@ get_vacuum_options(const VacuumStmt *stmt)
 
 	return (stmt->is_vacuumcmd ? VACOPT_VACUUM : VACOPT_ANALYZE) | (verbose ? VACOPT_VERBOSE : 0) |
 		   (analyze ? VACOPT_ANALYZE : 0);
+}
+
+static inline ResultRelInfo *
+get_estate_resultrelinfo(EState *estate)
+{
+#if PG14_LT
+	return estate->es_result_relation_info;
+#else
+	Assert(estate->es_result_relations[0]);
+	return estate->es_result_relations[0];
+#endif
 }
 
 /* PG13 added a dstlen parameter to pg_b64_decode and pg_b64_encode */
