@@ -207,6 +207,12 @@ get_estate_resultrelinfo(EState *estate)
 #endif
 }
 
+#if PG14_LT
+#define raw_parser_compat(cmd) raw_parser(cmd)
+#else
+#define raw_parser_compat(cmd) raw_parser(cmd, RAW_PARSE_DEFAULT)
+#endif
+
 /* PG14 splits Copy code into separate code for COPY FROM and COPY TO
  * since we were only interested in the COPY FROM parts we macro CopyState
  * to CopyFromState for PG14
