@@ -3304,6 +3304,9 @@ process_altertable_end_subcmd(Hypertable *ht, Node *parsetree, ObjectAddress *ob
 		case AT_DropOids:
 		case AT_SetOptions:
 		case AT_ResetOptions:
+#if PG14_GE
+		case AT_SetCompression:
+#endif
 			/* Avoid running this command for distributed hypertable chunks
 			 * since PostgreSQL currently does not allow to alter
 			 * storage options for a foreign table. */
