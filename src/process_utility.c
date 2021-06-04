@@ -3320,6 +3320,9 @@ process_altertable_end_subcmd(Hypertable *ht, Node *parsetree, ObjectAddress *ob
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("hypertables do not support inheritance")));
+#if PG14_GE
+    case AT_AlterCollationRefreshVersion:
+#endif
 		case AT_SetStatistics:
 		case AT_SetLogged:
 		case AT_SetStorage:
