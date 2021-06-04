@@ -171,20 +171,24 @@ get_vacuum_options(const VacuumStmt *stmt)
 		   (analyze ? VACOPT_ANALYZE : 0);
 }
 
+#if PG14_LT
 static inline int
 get_cluster_options(const ClusterStmt *stmt)
 {
-#if PG14_LT
 	return stmt->options;
+}
 #else
+static inline ClusterParams *
+get_cluster_options(const ClusterStmt *stmt)
+{
 	ListCell *lc;
+	ClusterParams *params = palloc0(sizeof(ClusterParams));
 	bool verbose = false;
 
 	/* Parse option list */
 	foreach (lc, stmt->params)
 	{
 		DefElem *opt = (DefElem *) lfirst(lc);
-
 		if (strcmp(opt->defname, "verbose") == 0)
 			verbose = defGetBoolean(opt);
 		else
@@ -194,9 +198,13 @@ get_cluster_options(const ClusterStmt *stmt)
 					 parser_errposition(NULL, opt->location)));
 	}
 
-	return verbose ? CLUOPT_VERBOSE : 0;
-#endif
+	params->options = (verbose ? CLUOPT_VERBOSE : 0);
+
+	return params;
 }
+#endif
+
+#include <catalog/index.h>
 
 static inline int
 get_reindex_options(ReindexStmt *stmt)
@@ -204,7 +212,25 @@ get_reindex_options(ReindexStmt *stmt)
 #if PG14_LT
 	return stmt->options;
 #else
-	return ReindexParseOptions(NULL, stmt);
+	ListCell *lc;
+	bool concurrently = false;
+	bool verbose = false;
+
+	/* Parse option list */
+	foreach (lc, stmt->params)
+	{
+		DefElem *opt = (DefElem *) lfirst(lc);
+		if (strcmp(opt->defname, "verbose") == 0)
+			verbose = defGetBoolean(opt);
+		else if (strcmp(opt->defname, "concurrently") == 0)
+			concurrently = defGetBoolean(opt);
+		else
+			ereport(ERROR,
+					(errcode(ERRCODE_SYNTAX_ERROR),
+					 errmsg("unrecognized REINDEX option \"%s\"", opt->defname),
+					 parser_errposition(NULL, opt->location)));
+	}
+	return (verbose ? REINDEXOPT_VERBOSE : 0) | (concurrently ? REINDEXOPT_CONCURRENTLY : 0);
 #endif
 }
 

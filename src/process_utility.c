@@ -1488,15 +1488,14 @@ reindex_chunk(Hypertable *ht, Oid chunk_relid, void *arg)
 		case REINDEX_OBJECT_TABLE:
 			stmt->relation->relname = NameStr(chunk->fd.table_name);
 			stmt->relation->schemaname = NameStr(chunk->fd.schema_name);
+#if PG14_LT
 			ReindexTable(stmt->relation,
 						 get_reindex_options(stmt),
-
-#if PG14_LT
 						 stmt->concurrent /* should test for deadlocks */
-#elif PG14_GE
-						 false /* isTopLevel */
-#endif
 			);
+#elif PG14_GE
+			ExecReindex(NULL, stmt, false);
+#endif
 			break;
 		case REINDEX_OBJECT_INDEX:
 			/* Not supported, a.t.m. See note in process_reindex(). */
