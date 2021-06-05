@@ -396,6 +396,14 @@ get_estate_resultrelinfo(EState *estate)
 #define pull_varnos_compat(root, expr) pull_varnos(root, expr)
 #endif
 
+#if PG14_LT
+#define find_inheritance_children_compat(parentrelid, include_detached, lockmode)                  \
+	find_inheritance_children(parentrelid, lockmode)
+#else
+#define find_inheritance_children_compat(parentrelid, include_detached, lockmode)                  \
+	find_inheritance_children(parentrelid, include_detached, lockmode)
+#endif
+
 /* PG13 added a dstlen parameter to pg_b64_decode and pg_b64_encode */
 #if PG13_LT
 #define pg_b64_encode_compat(src, srclen, dst, dstlen) pg_b64_encode((src), (srclen), (dst))
