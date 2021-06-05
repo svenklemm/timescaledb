@@ -3307,6 +3307,9 @@ process_altertable_end_subcmd(Hypertable *ht, Node *parsetree, ObjectAddress *ob
 #if PG14_GE
 		case AT_SetCompression:
 #endif
+#if PG14_GE
+		case AT_ReAddStatistics:
+#endif
 			/* Avoid running this command for distributed hypertable chunks
 			 * since PostgreSQL currently does not allow to alter
 			 * storage options for a foreign table. */
