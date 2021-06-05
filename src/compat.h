@@ -404,6 +404,14 @@ get_estate_resultrelinfo(EState *estate)
 	find_inheritance_children(parentrelid, include_detached, lockmode)
 #endif
 
+#if PG14_LT
+#define estimate_num_groups_compat(root, exprs, rows, pgset, estinfo)                              \
+	estimate_num_groups(root, exprs, rows, pgset)
+#else
+#define estimate_num_groups_compat(root, exprs, rows, pgset, estinfo)                              \
+	estimate_num_groups(root, exprs, rows, pgset, estinfo)
+#endif
+
 /* PG13 added a dstlen parameter to pg_b64_decode and pg_b64_encode */
 #if PG13_LT
 #define pg_b64_encode_compat(src, srclen, dst, dstlen) pg_b64_encode((src), (srclen), (dst))

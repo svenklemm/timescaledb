@@ -114,11 +114,12 @@ get_upper_rel_estimate(PlannerInfo *root, RelOptInfo *rel, CostEstimate *ce)
 
 	/* Get number of grouping columns and possible number of groups */
 	num_group_cols = list_length(root->parse->groupClause);
-	num_groups = estimate_num_groups(root,
-									 get_sortgrouplist_exprs(root->parse->groupClause,
-															 fpinfo->grouped_tlist),
-									 input_rows,
-									 NULL);
+	num_groups = estimate_num_groups_compat(root,
+											get_sortgrouplist_exprs(root->parse->groupClause,
+																	fpinfo->grouped_tlist),
+											input_rows,
+											NULL,
+											NULL);
 
 	/*
 	 * Number of rows expected from data node will be same as
