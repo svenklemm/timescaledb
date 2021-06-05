@@ -80,7 +80,9 @@ hypertable_insert_begin(CustomScanState *node, EState *estate, int eflags)
 	PlanState *ps;
 	List *chunk_dispatch_states = NIL;
 	ListCell *lc;
+#if PG14_LT
 	int i;
+#endif
 
 	ps = ExecInitNode(&state->mt->plan, estate, eflags);
 	node->custom_ps = list_make1(ps);
@@ -90,12 +92,16 @@ hypertable_insert_begin(CustomScanState *node, EState *estate, int eflags)
 	 * Find all ChunkDispatchState subnodes and set their parent
 	 * ModifyTableState node
 	 */
+#if PG14_LT
 	for (i = 0; i < mtstate->mt_nplans; i++)
 	{
 		List *substates = get_chunk_dispatch_states(mtstate->mt_plans[i]);
 
 		chunk_dispatch_states = list_concat(chunk_dispatch_states, substates);
 	}
+#else
+		chunk_dispatch_states = get_chunk_dispatch_states(&mtstate->ps);
+#endif
 
 	/* Ensure that we found at least one ChunkDispatchState node */
 	Assert(list_length(chunk_dispatch_states) > 0);
@@ -451,9 +457,15 @@ ts_hypertable_insert_path_create(PlannerInfo *root, ModifyTablePath *mtpath)
 	HypertableInsertPath *hipath;
 	int i = 0;
 
+#if PG14_LT
 	Assert(list_length(mtpath->subpaths) == list_length(mtpath->resultRelations));
+#endif
 
+#if PG14_LT
 	forboth (lc_path, mtpath->subpaths, lc_rel, mtpath->resultRelations)
+#else
+	forboth (lc_path, list_make1(mtpath->subpath), lc_rel, mtpath->resultRelations)
+#endif
 	{
 		Path *subpath = lfirst(lc_path);
 		Index rti = lfirst_int(lc_rel);
@@ -501,7 +513,9 @@ ts_hypertable_insert_path_create(PlannerInfo *root, ModifyTablePath *mtpath)
 	hipath->distributed_insert_plans = distributed_insert_plans;
 	hipath->serveroids = ts_hypertable_get_available_data_node_server_oids(ht);
 	path = &hipath->cpath.path;
+#if PG14_LT
 	mtpath->subpaths = subpaths;
+#endif
 
 	ts_cache_release(hcache);
 

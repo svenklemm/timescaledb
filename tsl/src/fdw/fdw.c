@@ -287,7 +287,11 @@ static void
 begin_foreign_modify(ModifyTableState *mtstate, ResultRelInfo *rri, List *fdw_private,
 					 int subplan_index, int eflags)
 {
+#if PG14_LT
 	Plan *subplan = mtstate->mt_plans[subplan_index]->plan;
+#else
+	Plan *subplan = mtstate->ps.plan->lefttree;
+#endif
 
 	/*
 	 * Do nothing in EXPLAIN (no ANALYZE) case.  rri->ri_FdwState stays NULL.

@@ -107,7 +107,9 @@ create_chunk_result_relation_info(ChunkDispatch *dispatch, Relation rel)
 	/* Copy options from the main table's (hypertable's) result relation info */
 	rri->ri_WithCheckOptions = rri_orig->ri_WithCheckOptions;
 	rri->ri_WithCheckOptionExprs = rri_orig->ri_WithCheckOptionExprs;
+#if PG14_LT
 	rri->ri_junkFilter = rri_orig->ri_junkFilter;
+#endif
 	rri->ri_projectReturning = rri_orig->ri_projectReturning;
 
 	rri->ri_FdwState = NULL;
@@ -134,7 +136,9 @@ create_compress_chunk_result_relation_info(ChunkDispatch *dispatch, Relation com
 	/* RLS policies are not supported if compression is enabled */
 	Assert(rri_orig->ri_WithCheckOptions == NULL && rri_orig->ri_WithCheckOptionExprs == NULL);
 	Assert(rri_orig->ri_projectReturning == NULL);
+#if PG14_LT
 	rri->ri_junkFilter = rri_orig->ri_junkFilter;
+#endif
 
 	/* compressed rel chunk is on data node. Does not need any FDW access on AN */
 	rri->ri_FdwState = NULL;
