@@ -405,11 +405,11 @@ get_estate_resultrelinfo(EState *estate)
 #endif
 
 #if PG14_LT
-#define find_inheritance_children_compat(parentrelid, include_detached, lockmode)                  \
+#define find_inheritance_children_compat(parentrelid, lockmode)                  \
 	find_inheritance_children(parentrelid, lockmode)
 #else
-#define find_inheritance_children_compat(parentrelid, include_detached, lockmode)                  \
-	find_inheritance_children(parentrelid, include_detached, lockmode)
+#define find_inheritance_children_compat(parentrelid, lockmode)                  \
+	find_inheritance_children(parentrelid, true, lockmode, NULL)
 #endif
 
 #if PG14_LT

@@ -619,7 +619,7 @@ ts_hypertable_create_trigger(Hypertable *ht, CreateTrigStmt *stmt, const char *q
 	if (saved_uid != owner)
 		SetUserIdAndSecContext(owner, sec_ctx | SECURITY_LOCAL_USERID_CHANGE);
 
-	chunks = find_inheritance_children_compat(ht->main_table_relid, false, NoLock);
+	chunks = find_inheritance_children_compat(ht->main_table_relid, NoLock);
 
 	foreach (lc, chunks)
 	{
@@ -646,7 +646,7 @@ ts_hypertable_create_trigger(Hypertable *ht, CreateTrigStmt *stmt, const char *q
 TSDLLEXPORT void
 ts_hypertable_drop_trigger(Oid relid, const char *trigger_name)
 {
-	List *chunks = find_inheritance_children_compat(relid, false, NoLock);
+	List *chunks = find_inheritance_children_compat(relid, NoLock);
 	ListCell *lc;
 
 	if (OidIsValid(relid))
@@ -1396,7 +1396,7 @@ static bool inline table_has_rules(Relation rel) { return rel->rd_rules != NULL;
 bool
 ts_hypertable_has_chunks(Oid table_relid, LOCKMODE lockmode)
 {
-	return find_inheritance_children_compat(table_relid, false, lockmode) != NIL;
+	return find_inheritance_children_compat(table_relid, lockmode) != NIL;
 }
 
 static void

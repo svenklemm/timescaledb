@@ -597,7 +597,7 @@ foreach_chunk(Hypertable *ht, process_chunk_t process_chunk, void *arg)
 	if (NULL == ht)
 		return -1;
 
-	chunks = find_inheritance_children_compat(ht->main_table_relid, false, NoLock);
+	chunks = find_inheritance_children_compat(ht->main_table_relid, NoLock);
 
 	foreach (lc, chunks)
 	{
@@ -632,7 +632,7 @@ foreach_chunk_multitransaction(Oid relid, MemoryContext mctx, mt_process_chunk_t
 	}
 
 	hypertable_id = ht->fd.id;
-	chunks = find_inheritance_children_compat(ht->main_table_relid, false, NoLock);
+	chunks = find_inheritance_children_compat(ht->main_table_relid, NoLock);
 
 	ts_cache_release(hcache);
 	CommitTransactionCommand();
