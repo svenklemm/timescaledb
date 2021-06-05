@@ -100,6 +100,14 @@
 #define TTSOpsMinimalTupleP (&TTSOpsMinimalTuple)
 #define TTSOpsBufferHeapTupleP (&TTSOpsBufferHeapTuple)
 
+/* PG14 renames predefined roles
+ *
+ * https://github.com/postgres/postgres/commit/c9c41c7a33
+ */
+#if PG14_LT
+#define ROLE_PG_READ_ALL_SETTINGS DEFAULT_ROLE_READ_ALL_SETTINGS
+#endif
+
 /* fmgr
  * In a9c35cf postgres changed how it calls SQL functions so that the number of
  * argument-slots allocated is chosen dynamically, instead of being fixed. This
