@@ -64,12 +64,15 @@
  * behavior of the new version we simply adopt the new version's name.
  */
 
-#if PG13_GE
-#define ExecComputeStoredGeneratedCompat(estate, slot, cmd_type)                                   \
+#if PG12
+#define ExecComputeStoredGeneratedCompat(rri, estate, slot, cmd_type)                                   \
+	ExecComputeStoredGenerated(estate, slot)
+#elif PG13
+#define ExecComputeStoredGeneratedCompat(rri, estate, slot, cmd_type)                                   \
 	ExecComputeStoredGenerated(estate, slot, cmd_type)
 #else
-#define ExecComputeStoredGeneratedCompat(estate, slot, cmd_type)                                   \
-	ExecComputeStoredGenerated(estate, slot)
+#define ExecComputeStoredGeneratedCompat(rri, estate, slot, cmd_type)                                   \
+	ExecComputeStoredGenerated(rri, estate, slot, cmd_type)
 #endif
 
 #if PG14_LT

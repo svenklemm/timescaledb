@@ -370,7 +370,7 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 			/* Compute stored generated columns */
 			if (check_resultRelInfo->ri_RelationDesc->rd_att->constr &&
 				check_resultRelInfo->ri_RelationDesc->rd_att->constr->has_generated_stored)
-				ExecComputeStoredGeneratedCompat(estate, myslot, CMD_INSERT);
+				ExecComputeStoredGeneratedCompat(check_resultRelInfo, estate, myslot, CMD_INSERT);
 
 			/*
 			 * If the target is a plain table, check the constraints of
