@@ -393,7 +393,7 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 								   ti_options,
 								   bistate);
 				if (resultRelInfo->ri_NumIndices > 0)
-					recheckIndexes = ExecInsertIndexTuples(compress_slot, estate, false, NULL, NIL);
+					recheckIndexes = ExecInsertIndexTuplesCompat(resultRelInfo, compress_slot, estate, false, false, NULL, NIL);
 			}
 			else
 			{
@@ -405,7 +405,7 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 								   bistate);
 
 				if (resultRelInfo->ri_NumIndices > 0)
-					recheckIndexes = ExecInsertIndexTuples(myslot, estate, false, NULL, NIL);
+					recheckIndexes = ExecInsertIndexTuplesCompat(resultRelInfo, myslot, estate, false, false, NULL, NIL);
 			}
 
 			/* AFTER ROW INSERT Triggers */

@@ -72,6 +72,14 @@
 	ExecComputeStoredGenerated(estate, slot)
 #endif
 
+#if PG14_LT
+#define ExecInsertIndexTuplesCompat(rri, slot, estate, update, noDupErr, specConflict, arbiterIndexes)     \
+  ExecInsertIndexTuples(slot, estate, noDupErr, specConflict, arbiterIndexes)
+#else
+#define ExecInsertIndexTuplesCompat(rri, slot, estate, update, noDupErr, specConflict, arbiterIndexes)     \
+  ExecInsertIndexTuples(rri, slot, estate, update, noDupErr, specConflict, arbiterIndexes)
+#endif
+
 /* PG14 fixes a bug in miscomputation of relids set in pull_varnos. The bugfix
  * got backported to PG12 and PG13 but changes the signature of pull_varnos,
  * make_simple_restrictinfo and make_restrictinfo. To not break existing code
