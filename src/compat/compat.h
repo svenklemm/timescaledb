@@ -207,6 +207,16 @@ get_vacuum_options(const VacuumStmt *stmt)
 		   (analyze ? VACOPT_ANALYZE : 0);
 }
 
+static inline ResultRelInfo *
+get_estate_resultrelinfo(EState *estate)
+{
+#if PG14_LT
+	return estate->es_result_relation_info;
+#else
+	return linitial(estate->es_opened_result_relations);
+#endif
+}
+
 #if PG14_LT
 static inline int
 get_cluster_options(const ClusterStmt *stmt)

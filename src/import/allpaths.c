@@ -181,7 +181,7 @@ ts_set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, Index rti, RangeT
 		if (IS_DUMMY_REL(childrel))
 			continue;
 
-		/* Bubble up childrel's partitioned children. */
+			/* Bubble up childrel's partitioned children. */
 #if PG14_LT
 		if (rel->part_scheme)
 			rel->partitioned_child_rels = list_concat(rel->partitioned_child_rels,

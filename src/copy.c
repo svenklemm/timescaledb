@@ -37,14 +37,13 @@
 #include <utils/rls.h>
 
 #include "compat/compat.h"
-#include "hypertable.h"
 #include "copy.h"
-#include "dimension.h"
-#include "nodes/chunk_insert_state.h"
-#include "nodes/chunk_dispatch.h"
-#include "subspace_store.h"
-#include "compat/compat.h"
 #include "cross_module_fn.h"
+#include "dimension.h"
+#include "hypertable.h"
+#include "nodes/chunk_dispatch.h"
+#include "nodes/chunk_insert_state.h"
+#include "subspace_store.h"
 
 /*
  * Copy from a file to a hypertable.
@@ -232,11 +231,16 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 	 */
 	resultRelInfo = makeNode(ResultRelInfo);
 
+#if PG14_LT
 	InitResultRelInfo(resultRelInfo,
 					  ccstate->rel,
 					  /* RangeTableIndex */ 1,
 					  NULL,
 					  0);
+#else
+	ExecInitRangeTable(estate, range_table);
+	ExecInitResultRelation(estate, resultRelInfo, 1);
+#endif
 
 	CheckValidResultRel(resultRelInfo, CMD_INSERT);
 
@@ -245,11 +249,16 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 #if PG14_LT
 	estate->es_result_relations = resultRelInfo;
 	estate->es_num_result_relations = 1;
-#endif
 	estate->es_result_relation_info = resultRelInfo;
 	estate->es_range_table = range_table;
+#endif
 
+#if PG14_LT
 	ExecInitRangeTable(estate, estate->es_range_table);
+#endif
+
+	if (!ccstate->dispatch->hypertable_result_rel_info)
+		ccstate->dispatch->hypertable_result_rel_info = resultRelInfo;
 
 	singleslot = table_slot_create(resultRelInfo->ri_RelationDesc, &estate->es_tupleTable);
 
@@ -309,8 +318,8 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 		point = ts_hyperspace_calculate_point(ht->space, myslot);
 
 		/* Save the main table's (hypertable's) ResultRelInfo */
-		if (NULL == dispatch->hypertable_result_rel_info)
-			dispatch->hypertable_result_rel_info = estate->es_result_relation_info;
+		if (!dispatch->hypertable_result_rel_info)
+			dispatch->hypertable_result_rel_info = saved_resultRelInfo;
 
 		/* Find or create the insert state matching the point */
 		cis = ts_chunk_dispatch_get_chunk_insert_state(dispatch,
@@ -341,7 +350,9 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 		 */
 		saved_resultRelInfo = resultRelInfo;
 		resultRelInfo = cis->result_relation_info;
+#if PG14_LT
 		estate->es_result_relation_info = resultRelInfo;
+#endif
 
 		if (cis->compress_state != NULL)
 			check_resultRelInfo = cis->orig_result_relation_info;
@@ -438,10 +449,14 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 		}
 
 		resultRelInfo = saved_resultRelInfo;
+#if PG14_LT
 		estate->es_result_relation_info = resultRelInfo;
+#endif
 	}
 
+#if PG14_LT
 	estate->es_result_relation_info = ccstate->dispatch->hypertable_result_rel_info;
+#endif
 
 	/* Done, clean up */
 	if (errcallback.previous)
@@ -459,9 +474,9 @@ copyfrom(CopyChunkState *ccstate, List *range_table, Hypertable *ht, void (*call
 
 	ExecResetTupleTable(estate->es_tupleTable, false);
 
+#if PG14_LT
 	ExecCloseIndices(resultRelInfo);
 	/* Close any trigger target relations */
-#if PG14_LT
 	ExecCleanUpTriggerState(estate);
 #else
 	ExecCloseResultRelations(estate);

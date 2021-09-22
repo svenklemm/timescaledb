@@ -1500,7 +1500,8 @@ static const char *
 deparsed_insert_stmt_get_sql_internal(DeparsedInsertStmt *stmt, StringInfo buf, int64 num_rows,
 									  bool abbrev)
 {
-	appendStringInfoString(buf, stmt->target);
+	if (stmt->target)
+		appendStringInfoString(buf, stmt->target);
 
 	if (stmt->num_target_attrs > 0)
 	{

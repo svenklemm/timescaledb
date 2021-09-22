@@ -90,17 +90,30 @@ create_chunk_result_relation_info(ChunkDispatch *dispatch, Relation rel)
 	rri = palloc0(sizeof(ResultRelInfo));
 	NodeSetTag(rri, T_ResultRelInfo);
 
+	if (dispatch->dispatch_state)
+	{
+		rri_orig = dispatch->dispatch_state->mtstate->resultRelInfo;
+		hyper_rti = rri_orig->ri_RangeTableIndex;
+	}
+	else
+	{
+		hyper_rti = 1;
+		rri_orig = dispatch->estate->es_result_relations[0];
+	}
+	dispatch->hypertable_result_rel_info = rri_orig;
+
 	InitResultRelInfo(rri, rel, hyper_rti, NULL, dispatch->estate->es_instrument);
 
 	/* Copy options from the main table's (hypertable's) result relation info */
-	rri_orig = dispatch->hypertable_result_rel_info;
 	rri->ri_WithCheckOptions = rri_orig->ri_WithCheckOptions;
 	rri->ri_WithCheckOptionExprs = rri_orig->ri_WithCheckOptionExprs;
+#if PG14_LT
 	rri->ri_junkFilter = rri_orig->ri_junkFilter;
+#endif
 	rri->ri_projectReturning = rri_orig->ri_projectReturning;
 
 	rri->ri_FdwState = NULL;
-	rri->ri_usesFdwDirectModify = dispatch->hypertable_result_rel_info->ri_usesFdwDirectModify;
+	rri->ri_usesFdwDirectModify = rri_orig->ri_usesFdwDirectModify;
 
 	if (RelationGetForm(rel)->relkind == RELKIND_FOREIGN_TABLE)
 		rri->ri_FdwRoutine = GetFdwRoutineForRelation(rel, true);
@@ -123,7 +136,9 @@ create_compress_chunk_result_relation_info(ChunkDispatch *dispatch, Relation com
 	/* RLS policies are not supported if compression is enabled */
 	Assert(rri_orig->ri_WithCheckOptions == NULL && rri_orig->ri_WithCheckOptionExprs == NULL);
 	Assert(rri_orig->ri_projectReturning == NULL);
+#if PG14_LT
 	rri->ri_junkFilter = rri_orig->ri_junkFilter;
+#endif
 
 	/* compressed rel chunk is on data node. Does not need any FDW access on AN */
 	rri->ri_FdwState = NULL;
@@ -213,6 +228,7 @@ translate_clause(List *inclause, TupleConversionMap *chunk_map, Index varno, Rel
 static List *
 adjust_hypertable_tlist(List *tlist, TupleConversionMap *map)
 {
+	return tlist;
 	List *new_tlist = NIL;
 	TupleDesc chunk_tupdesc = map->outdesc;
 #if PG13_GE
@@ -236,6 +252,7 @@ adjust_hypertable_tlist(List *tlist, TupleConversionMap *map)
 			 * the resno the match the partition's attno.
 			 */
 			tle = (TargetEntry *) list_nth(tlist, attrMap[chunk_attrno - 1] - 1);
+			Assert(namestrcmp(&att_tup->attname, tle->resname) == 0);
 			if (namestrcmp(&att_tup->attname, tle->resname) != 0)
 				elog(ERROR, "invalid translation of ON CONFLICT update statements");
 			tle->resno = chunk_attrno;
@@ -264,6 +281,35 @@ adjust_hypertable_tlist(List *tlist, TupleConversionMap *map)
 		new_tlist = lappend(new_tlist, tle);
 	}
 	return new_tlist;
+}
+
+/*
+ * adjust_partition_colnos
+ *		Adjust the list of UPDATE target column numbers to account for
+ *		attribute differences between the parent and the partition.
+ */
+static List *
+adjust_partition_colnos(List *colnos, ResultRelInfo *leaf_part_rri, TupleConversionMap *map)
+{
+	List *new_colnos = NIL;
+	//	TupleConversionMap *map = ExecGetChildToRootMap(leaf_part_rri);
+	AttrMap *attrMap;
+	ListCell *lc;
+
+	Assert(map);
+	attrMap = map->attrMap;
+
+	foreach (lc, colnos)
+	{
+		AttrNumber parentattrno = lfirst_int(lc);
+
+		if (parentattrno <= 0 || parentattrno > attrMap->maplen ||
+			attrMap->attnums[parentattrno - 1] == 0)
+			elog(ERROR, "unexpected attno %d in target column list", parentattrno);
+		new_colnos = lappend_int(new_colnos, attrMap->attnums[parentattrno - 1]);
+	}
+
+	return new_colnos;
 }
 
 static inline ResultRelInfo *
@@ -368,15 +414,18 @@ setup_on_conflict_state(ChunkInsertState *state, ChunkDispatch *dispatch,
 	state->conflproj_tupdesc = get_default_confl_tupdesc(state, dispatch);
 	state->conflproj_slot = get_default_confl_slot(state, dispatch);
 
-	if (NULL != map)
+	if (map)
 	{
 		ExprContext *econtext = hyper_rri->ri_onConflict->oc_ProjInfo->pi_exprContext;
 		Node *onconflict_where = ts_chunk_dispatch_get_on_conflict_where(dispatch);
 		List *onconflset;
+		ModifyTableState *mtstate = dispatch->dispatch_state->mtstate;
+		ModifyTable *mt = castNode(ModifyTable, mtstate->ps.plan);
+		List *onconflcols;
 
 		Assert(map->outdesc == RelationGetDescr(chunk_rel));
 
-		if (NULL == chunk_map)
+		if (!chunk_map)
 			chunk_map = convert_tuples_by_name_compat(RelationGetDescr(chunk_rel),
 													  RelationGetDescr(hyper_rel),
 													  gettext_noop("could not convert row type"));
@@ -388,23 +437,40 @@ setup_on_conflict_state(ChunkInsertState *state, ChunkDispatch *dispatch,
 									  chunk_rel);
 
 		onconflset = adjust_hypertable_tlist(onconflset, state->hyper_to_chunk_map);
+		chunk_rri->ri_RootResultRelInfo = hyper_rri;
+		if (chunk_map)
+			onconflcols = adjust_partition_colnos(mt->onConflictCols, chunk_rri, chunk_map);
+		else
+			onconflcols = mt->onConflictCols;
 
 		/* create the tuple slot for the UPDATE SET projection */
 		state->conflproj_tupdesc = ExecTypeFromTL(onconflset);
 		state->conflproj_slot = get_confl_slot(state, dispatch, state->conflproj_tupdesc);
 
-		/* build UPDATE SET projection state */
+		chunk_rri->ri_onConflict->oc_ProjSlot =
+			table_slot_create(chunk_rel, &mtstate->ps.state->es_tupleTable);
+
 		chunk_rri->ri_onConflict->oc_ProjInfo =
-			ExecBuildProjectionInfo(onconflset,
-									econtext,
-									state->conflproj_slot,
-									NULL,
-									RelationGetDescr(chunk_rel));
+			ExecBuildUpdateProjection(onconflset,
+									  true,
+									  onconflcols,
+									  RelationGetDescr(chunk_rel),
+									  econtext,
+									  chunk_rri->ri_onConflict->oc_ProjSlot,
+									  &mtstate->ps);
+
+		/* build UPDATE SET projection state */
+		//		chunk_rri->ri_onConflict->oc_ProjInfo =
+		//			ExecBuildProjectionInfo(onconflset,
+		//									econtext,
+		//									state->conflproj_slot,
+		//									NULL,
+		//									RelationGetDescr(chunk_rel));
 
 		/*
 		 * Map attribute numbers in the WHERE clause, if it exists.
 		 */
-		if (NULL != onconflict_where)
+		if (onconflict_where)
 		{
 			List *clause = translate_clause(castNode(List, onconflict_where),
 											chunk_map,
@@ -478,29 +544,39 @@ adjust_projections(ChunkInsertState *cis, ChunkDispatch *dispatch, Oid rowtype)
 	ResultRelInfo *chunk_rri = cis->result_relation_info;
 	Relation hyper_rel = dispatch->hypertable_result_rel_info->ri_RelationDesc;
 	Relation chunk_rel = cis->rel;
-	TupleConversionMap *chunk_map = NULL;
+	AttrMap *chunk_map = NULL;
 	OnConflictAction onconflict_action = ts_chunk_dispatch_get_on_conflict_action(dispatch);
 
 	if (ts_chunk_dispatch_has_returning(dispatch))
 	{
+		bool found_whole_row;
 		/*
 		 * We need the opposite map from cis->hyper_to_chunk_map. The map needs
 		 * to have the hypertable_desc in the out spot for map_variable_attnos
 		 * to work correctly in mapping hypertable attnos->chunk attnos.
 		 */
-		chunk_map = convert_tuples_by_name_compat(RelationGetDescr(chunk_rel),
-												  RelationGetDescr(hyper_rel),
-												  gettext_noop("could not convert row type"));
-
-		chunk_rri->ri_projectReturning =
-			get_adjusted_projection_info_returning(chunk_rri->ri_projectReturning,
-												   ts_chunk_dispatch_get_returning_clauses(
-													   dispatch),
-												   chunk_map,
-												   dispatch->hypertable_result_rel_info
-													   ->ri_RangeTableIndex,
-												   rowtype,
-												   RelationGetDescr(chunk_rel));
+		chunk_map = build_attrmap_by_name(RelationGetDescr(chunk_rel), RelationGetDescr(hyper_rel));
+		//		chunk_map = convert_tuples_by_name_compat(RelationGetDescr(chunk_rel),
+		//												  RelationGetDescr(hyper_rel),
+		//												  gettext_noop("could not convert row
+		//type"));
+		//
+		//chunk_rri->ri_returningList =
+		//	map_variable_attnos((Node *) chunk_rri->ri_returningList,
+		//						dispatch->hypertable_result_rel_info->ri_RangeTableIndex,
+		//						0,
+		//						chunk_map,
+		//						RelationGetForm(chunk_rel)->reltype,
+		//						&found_whole_row);
+				chunk_rri->ri_projectReturning =
+					get_adjusted_projection_info_returning(chunk_rri->ri_projectReturning,
+														   ts_chunk_dispatch_get_returning_clauses(
+															   dispatch),
+														   chunk_map,
+														   dispatch->hypertable_result_rel_info
+															   ->ri_RangeTableIndex,
+														   rowtype,
+														   RelationGetDescr(chunk_rel));
 	}
 
 	/* Set the chunk's arbiter indexes for ON CONFLICT statements */
@@ -509,7 +585,14 @@ adjust_projections(ChunkInsertState *cis, ChunkDispatch *dispatch, Oid rowtype)
 		set_arbiter_indexes(cis, dispatch);
 
 		if (onconflict_action == ONCONFLICT_UPDATE)
+		{
+			TupleConversionMap *chunk_map =
+				convert_tuples_by_name_compat(RelationGetDescr(chunk_rel),
+											  RelationGetDescr(hyper_rel),
+											  gettext_noop("could not convert row type"));
+
 			setup_on_conflict_state(cis, dispatch, chunk_map);
+		}
 	}
 }
 

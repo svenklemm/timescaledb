@@ -21,7 +21,6 @@
 #include "relinfo.h"
 #include "estimate.h"
 #include "deparse.h"
-#include "compat.h"
 
 /* If no remote estimates, assume a sort costs 5% extra.  */
 #define DEFAULT_FDW_SORT_MULTIPLIER 1.05

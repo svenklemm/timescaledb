@@ -98,7 +98,7 @@ ts_setup_append_rel_array(PlannerInfo *root)
 		root->append_rel_array =
 			repalloc(root->append_rel_array, root->simple_rel_array_size * sizeof(AppendRelInfo *));
 	else
-		root->append_rel_array = palloc(root->simple_rel_array_size * sizeof(AppendRelInfo *));
+		root->append_rel_array = palloc0(root->simple_rel_array_size * sizeof(AppendRelInfo *));
 
 	ListCell *lc;
 	foreach (lc, root->append_rel_list)
@@ -1138,6 +1138,9 @@ build_hypertable_partition_info(Hypertable *ht, PlannerInfo *root, RelOptInfo *h
 	part_scheme->partnatts = ht->space->num_dimensions;
 	part_scheme->strategy = PARTITION_STRATEGY_MULTIDIM;
 	hyper_rel->nparts = nparts;
+	part_scheme->partopfamily = palloc0(nparts * sizeof(Oid));
+	part_scheme->partopcintype = palloc0(nparts * sizeof(Oid));
+	part_scheme->partcollation = palloc0(nparts * sizeof(Oid));
 	hyper_rel->part_scheme = part_scheme;
 	hyper_rel->partexprs = get_hypertable_partexprs(ht, root->parse, hyper_rel->relid);
 	hyper_rel->nullable_partexprs = (List **) palloc0(sizeof(List *) * part_scheme->partnatts);

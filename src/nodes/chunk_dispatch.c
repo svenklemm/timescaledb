@@ -50,7 +50,7 @@ get_modifytable(const ChunkDispatch *dispatch)
 bool
 ts_chunk_dispatch_has_returning(const ChunkDispatch *dispatch)
 {
-	if (NULL == dispatch->dispatch_state)
+	if (!dispatch->dispatch_state)
 		return false;
 	return get_modifytable(dispatch)->returningLists != NIL;
 }
@@ -60,7 +60,12 @@ ts_chunk_dispatch_get_returning_clauses(const ChunkDispatch *dispatch)
 {
 	ModifyTableState *mtstate = dispatch->dispatch_state->mtstate;
 
+#if PG14_LT
 	return list_nth(get_modifytable(dispatch)->returningLists, mtstate->mt_whichplan);
+#else
+	Assert(list_length(get_modifytable(dispatch)->returningLists) == 1);
+	return linitial(get_modifytable(dispatch)->returningLists);
+#endif
 }
 
 List *
@@ -72,7 +77,7 @@ ts_chunk_dispatch_get_arbiter_indexes(const ChunkDispatch *dispatch)
 OnConflictAction
 ts_chunk_dispatch_get_on_conflict_action(const ChunkDispatch *dispatch)
 {
-	if (NULL == dispatch->dispatch_state)
+	if (!dispatch->dispatch_state)
 		return ONCONFLICT_NONE;
 	return get_modifytable(dispatch)->onConflictAction;
 }

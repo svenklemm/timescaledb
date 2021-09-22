@@ -55,7 +55,12 @@ on_chunk_insert_state_changed(ChunkInsertState *cis, void *data)
 
 	/* PG12 expects the current target slot to match the result relation. Thus
 	 * we need to make sure it is up-to-date with the current chunk here. */
+#if PG14_LT
 	mtstate->mt_scans[mtstate->mt_whichplan] = cis->slot;
+#endif
+	state->rri = cis->result_relation_info;
+	state->rri->ri_RootToPartitionMap = cis->hyper_to_chunk_map;
+	state->rri->ri_PartitionTupleSlot = cis->slot;
 }
 
 static TupleTableSlot *
@@ -87,11 +92,15 @@ chunk_dispatch_exec(CustomScanState *node)
 	point = ts_hyperspace_calculate_point(ht->space, slot);
 
 	/* Save the main table's (hypertable's) ResultRelInfo */
-	if (NULL == dispatch->hypertable_result_rel_info)
+	if (!dispatch->hypertable_result_rel_info)
 	{
-		Assert(RelationGetRelid(estate->es_result_relation_info->ri_RelationDesc) ==
-			   state->hypertable_relid);
-		dispatch->hypertable_result_rel_info = estate->es_result_relation_info;
+//		Assert(RelationGetRelid(get_estate_resultrelinfo(estate)->ri_RelationDesc) ==
+// state->hypertable_relid);
+#if PG14_LT
+		dispatch->hypertable_result_rel_info = get_estate_resultrelinfo(estate);
+#else
+		dispatch->hypertable_result_rel_info = dispatch->dispatch_state->mtstate->resultRelInfo;
+#endif
 	}
 
 	/* Find or create the insert state matching the point */
@@ -107,10 +116,12 @@ chunk_dispatch_exec(CustomScanState *node)
 	 * the es_result_relation_info this has to be updated every time, not
 	 * just when the chunk changes.
 	 */
+#if PG14_LT
 	if (cis->compress_state != NULL)
 		estate->es_result_relation_info = cis->orig_result_relation_info;
 	else
 		estate->es_result_relation_info = cis->result_relation_info;
+#endif
 
 	MemoryContextSwitchTo(old);
 
@@ -144,10 +155,15 @@ chunk_dispatch_exec(CustomScanState *node)
 		if (cis->rel->rd_att->constr)
 			ExecConstraints(cis->orig_result_relation_info, slot, estate);
 
+#if PG14_LT
 		estate->es_result_relation_info = cis->result_relation_info;
+#endif
 		Assert(ts_cm_functions->compress_row_exec != NULL);
 		slot = ts_cm_functions->compress_row_exec(cis->compress_state, slot);
 	}
+
+	state->mtstate->resultRelInfo = cis->result_relation_info;
+
 	return slot;
 }
 
@@ -219,7 +235,10 @@ ts_chunk_dispatch_state_set_parent(ChunkDispatchState *state, ModifyTableState *
 	ModifyTable *mt_plan = castNode(ModifyTable, mtstate->ps.plan);
 
 	/* Inserts on hypertables should always have one subplan */
+#if PG14_LT
 	Assert(mtstate->mt_nplans == 1);
+#endif
+	Assert(mtstate);
 	state->mtstate = mtstate;
 	state->arbiter_indexes = mt_plan->arbiterIndexes;
 }

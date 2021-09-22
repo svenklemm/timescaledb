@@ -22,6 +22,7 @@
 #include <hypertable_cache.h>
 #include <nodes/chunk_insert_state.h>
 #include <nodes/chunk_dispatch_plan.h>
+#include <nodes/chunk_dispatch_state.h>
 #include <compat/compat.h>
 #include <guc.h>
 
@@ -108,7 +109,7 @@ data_node_copy_begin(CustomScanState *node, EState *estate, int eflags)
 {
 	DataNodeCopyState *dncs = (DataNodeCopyState *) node;
 	CustomScan *cscan = castNode(CustomScan, node->ss.ps.plan);
-	ResultRelInfo *rri = estate->es_result_relation_info;
+	ResultRelInfo *rri = get_estate_resultrelinfo(estate);
 	Relation rel = rri->ri_RelationDesc;
 	Plan *subplan = linitial(cscan->custom_plans);
 	List *target_attrs = list_nth(cscan->custom_private, CustomScanPrivateTargetAttrs);
@@ -159,12 +160,12 @@ data_node_copy_exec(CustomScanState *node)
 	DataNodeCopyState *dncs = (DataNodeCopyState *) node;
 	PlanState *substate = linitial(dncs->cstate.custom_ps);
 	EState *estate = node->ss.ps.state;
-	ResultRelInfo *rri_saved = estate->es_result_relation_info;
+	ResultRelInfo *rri_saved = get_estate_resultrelinfo(estate);
 	TupleTableSlot *slot;
 	bool has_returning = rri_saved->ri_projectReturning != NULL;
 
 	/* Initially, the result relation should always match the hypertable.  */
-	Assert(node->ss.ps.state->es_result_relation_info->ri_RelationDesc->rd_id == dncs->rel->rd_id);
+	Assert(get_estate_resultrelinfo(node->ss.ps.state)->ri_RelationDesc->rd_id == dncs->rel->rd_id);
 
 	do
 	{
@@ -174,8 +175,9 @@ data_node_copy_exec(CustomScanState *node)
 		{
 			/* The child node (ChunkDispatch) routed the tuple to the right
 			 * chunk result relation */
-			const ResultRelInfo *rri_chunk = estate->es_result_relation_info;
-			const ChunkInsertState *cis = rri_chunk->ri_FdwState;
+			ChunkDispatchState *cds = linitial_node(CustomScanState, node->custom_ps);
+			ResultRelInfo *rri_chunk = cds->rri;
+			ChunkInsertState *cis = rri_chunk->ri_FdwState;
 			MemoryContext oldmctx;
 			bool success;
 			const TupleDesc rri_desc = RelationGetDescr(rri_chunk->ri_RelationDesc);
@@ -210,13 +212,15 @@ data_node_copy_exec(CustomScanState *node)
 
 	/* Reset the result relation to point to the root hypertable before
 	 * returning, since the child ChunkDispatch node set it to the chunk. */
+#if PG14_LT
 	estate->es_result_relation_info = rri_saved;
+#endif
 
 	/* Tuple routing in the ChunkDispatchState subnode sets the result
 	 * relation to a chunk when routing, but the read handler should have
 	 * ensured the result relation is reset. */
-	Assert(node->ss.ps.state->es_result_relation_info->ri_RelationDesc->rd_id == dncs->rel->rd_id);
-	Assert(node->ss.ps.state->es_result_relation_info->ri_usesFdwDirectModify);
+	Assert(get_estate_resultrelinfo(node->ss.ps.state)->ri_RelationDesc->rd_id == dncs->rel->rd_id);
+	Assert(get_estate_resultrelinfo(node->ss.ps.state)->ri_usesFdwDirectModify);
 
 	return slot;
 }
