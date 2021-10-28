@@ -1,0 +1,33 @@
+# This workflow tests installing our ubuntu and debian packages.
+name: Docker images
+on:
+  schedule:
+    # run daily 0:00 on master branch
+    - cron: '0 0 * * *'
+  push:
+#    tags:
+#    - '*'
+#    branches:
+#    - release_test
+jobs:
+  apt_tests:
+    name: APT ${{ matrix.image }} PG${{ matrix.pg }} ${{ matrix.license }}
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.image }}
+      env:
+        DEBIAN_FRONTEND: noninteractive
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ "timescale/timescaledb:latest-pg12" ]
+
+    steps:
+
+    - name:
+      run: |
+        id
+        apk add sudo
+        ps aux
+        sudo -u postgres psql -c 'SELECT version();'
+
