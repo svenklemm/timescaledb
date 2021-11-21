@@ -4,15 +4,15 @@ on:
     # run daily 20:00 on master branch
     - cron: '0 20 * * *'
   push:
-    tags:
-    - '*'
-    branches:
-    - release_test
+#    tags:
+#    - '*'
+#    branches:
+#    - release_test
 
 jobs:
   homebrew:
     name: Homebrew
-    runs-on: macos-latest
+    runs-on: macos-11
     strategy:
       fail-fast: false
       matrix:
