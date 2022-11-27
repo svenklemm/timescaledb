@@ -5,8 +5,8 @@ on:
     # run daily 21:00 on main branch
     - cron: '0 21 * * *'
   push:
-    branches:
-      - prerelease_test
+#    branches:
+#      - prerelease_test
 env:
   name: "Sanitizer"
   PG_SRC_DIR: "pgbuild"
@@ -58,7 +58,7 @@ jobs:
       matrix:
         # "os" has to be in the matrix due to a bug in "env": https://github.community/t/how-to-use-env-context/16975
         os: ["ubuntu-20.04"]
-        pg: ${{ fromJson(needs.config.outputs.pg_latest) }}
+        pg: ["12.13"]
     steps:
     - name: Install Linux Dependencies
       run: |
@@ -122,7 +122,8 @@ jobs:
         # test seems to fail due to a PostgreSQL bug where AbortStartTime in
         # postmaster.c is not atomic but read/written across signal handlers
         # and ServerLoop.
-        make -k -C build installcheck SKIPS='remote_txn' IGNORES='bgw_db_scheduler bgw_db_scheduler_fixed debug_notice' | tee installcheck.log
+        # make -k -C build regresscheck-t SKIPS='remote_txn' IGNORES='bgw_db_scheduler bgw_db_scheduler_fixed debug_notice' | tee installcheck.log
+        make -k -C build regresscheck-t TESTS='dist_param dist_copy_long dist_copy_available_dns dist_copy_format_long dist_ddl dist_move_chunk dist_hypertable-12 dist_partial_agg-12' | tee installcheck.log
 
     - name: Show regression diffs
       if: always()
