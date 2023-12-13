@@ -157,52 +157,7 @@ SELECT jsonb_pretty(rels) AS relations FROM relations;
          "num_reltuples": 0,                             +
          "num_caggs_nested": 0,                          +
          "num_caggs_finalized": 1,                       +
-         "num_caggs_on_distributed_hypertables": 0,      +
          "num_caggs_using_real_time_aggregation": 2      +
-     },                                                  +
-     "distributed_hypertables_data_node": {              +
-         "heap_size": 0,                                 +
-         "toast_size": 0,                                +
-         "compression": {                                +
-             "compressed_heap_size": 0,                  +
-             "compressed_row_count": 0,                  +
-             "compressed_toast_size": 0,                 +
-             "num_compressed_chunks": 0,                 +
-             "uncompressed_heap_size": 0,                +
-             "uncompressed_row_count": 0,                +
-             "compressed_indexes_size": 0,               +
-             "uncompressed_toast_size": 0,               +
-             "uncompressed_indexes_size": 0,             +
-             "num_compressed_hypertables": 0,            +
-             "compressed_row_count_frozen_immediately": 0+
-         },                                              +
-         "indexes_size": 0,                              +
-         "num_children": 0,                              +
-         "num_relations": 0,                             +
-         "num_reltuples": 0                              +
-     },                                                  +
-     "distributed_hypertables_access_node": {            +
-         "heap_size": 0,                                 +
-         "toast_size": 0,                                +
-         "compression": {                                +
-             "compressed_heap_size": 0,                  +
-             "compressed_row_count": 0,                  +
-             "compressed_toast_size": 0,                 +
-             "num_compressed_chunks": 0,                 +
-             "uncompressed_heap_size": 0,                +
-             "uncompressed_row_count": 0,                +
-             "compressed_indexes_size": 0,               +
-             "uncompressed_toast_size": 0,               +
-             "uncompressed_indexes_size": 0,             +
-             "num_compressed_hypertables": 0,            +
-             "compressed_row_count_frozen_immediately": 0+
-         },                                              +
-         "indexes_size": 0,                              +
-         "num_children": 0,                              +
-         "num_relations": 0,                             +
-         "num_reltuples": 0,                             +
-         "num_replica_chunks": 0,                        +
-         "num_replicated_distributed_hypertables": 0     +
      }                                                   +
  }
 (1 row)
@@ -310,52 +265,7 @@ SELECT jsonb_pretty(rels) AS relations FROM relations;
          "num_reltuples": 0,                             +
          "num_caggs_nested": 0,                          +
          "num_caggs_finalized": 1,                       +
-         "num_caggs_on_distributed_hypertables": 0,      +
          "num_caggs_using_real_time_aggregation": 2      +
-     },                                                  +
-     "distributed_hypertables_data_node": {              +
-         "heap_size": 0,                                 +
-         "toast_size": 0,                                +
-         "compression": {                                +
-             "compressed_heap_size": 0,                  +
-             "compressed_row_count": 0,                  +
-             "compressed_toast_size": 0,                 +
-             "num_compressed_chunks": 0,                 +
-             "uncompressed_heap_size": 0,                +
-             "uncompressed_row_count": 0,                +
-             "compressed_indexes_size": 0,               +
-             "uncompressed_toast_size": 0,               +
-             "uncompressed_indexes_size": 0,             +
-             "num_compressed_hypertables": 0,            +
-             "compressed_row_count_frozen_immediately": 0+
-         },                                              +
-         "indexes_size": 0,                              +
-         "num_children": 0,                              +
-         "num_relations": 0,                             +
-         "num_reltuples": 0                              +
-     },                                                  +
-     "distributed_hypertables_access_node": {            +
-         "heap_size": 0,                                 +
-         "toast_size": 0,                                +
-         "compression": {                                +
-             "compressed_heap_size": 0,                  +
-             "compressed_row_count": 0,                  +
-             "compressed_toast_size": 0,                 +
-             "num_compressed_chunks": 0,                 +
-             "uncompressed_heap_size": 0,                +
-             "uncompressed_row_count": 0,                +
-             "compressed_indexes_size": 0,               +
-             "uncompressed_toast_size": 0,               +
-             "uncompressed_indexes_size": 0,             +
-             "num_compressed_hypertables": 0,            +
-             "compressed_row_count_frozen_immediately": 0+
-         },                                              +
-         "indexes_size": 0,                              +
-         "num_children": 0,                              +
-         "num_relations": 0,                             +
-         "num_reltuples": 0,                             +
-         "num_replica_chunks": 0,                        +
-         "num_replicated_distributed_hypertables": 0     +
      }                                                   +
  }
 (1 row)
@@ -467,52 +377,7 @@ SELECT jsonb_pretty(rels) AS relations FROM relations;
          "num_reltuples": 0,                              +
          "num_caggs_nested": 0,                           +
          "num_caggs_finalized": 1,                        +
-         "num_caggs_on_distributed_hypertables": 0,       +
          "num_caggs_using_real_time_aggregation": 1       +
-     },                                                   +
-     "distributed_hypertables_data_node": {               +
-         "heap_size": 0,                                  +
-         "toast_size": 0,                                 +
-         "compression": {                                 +
-             "compressed_heap_size": 0,                   +
-             "compressed_row_count": 0,                   +
-             "compressed_toast_size": 0,                  +
-             "num_compressed_chunks": 0,                  +
-             "uncompressed_heap_size": 0,                 +
-             "uncompressed_row_count": 0,                 +
-             "compressed_indexes_size": 0,                +
-             "uncompressed_toast_size": 0,                +
-             "uncompressed_indexes_size": 0,              +
-             "num_compressed_hypertables": 0,             +
-             "compressed_row_count_frozen_immediately": 0 +
-         },                                               +
-         "indexes_size": 0,                               +
-         "num_children": 0,                               +
-         "num_relations": 0,                              +
-         "num_reltuples": 0                               +
-     },                                                   +
-     "distributed_hypertables_access_node": {             +
-         "heap_size": 0,                                  +
-         "toast_size": 0,                                 +
-         "compression": {                                 +
-             "compressed_heap_size": 0,                   +
-             "compressed_row_count": 0,                   +
-             "compressed_toast_size": 0,                  +
-             "num_compressed_chunks": 0,                  +
-             "uncompressed_heap_size": 0,                 +
-             "uncompressed_row_count": 0,                 +
-             "compressed_indexes_size": 0,                +
-             "uncompressed_toast_size": 0,                +
-             "uncompressed_indexes_size": 0,              +
-             "num_compressed_hypertables": 0,             +
-             "compressed_row_count_frozen_immediately": 0 +
-         },                                               +
-         "indexes_size": 0,                               +
-         "num_children": 0,                               +
-         "num_relations": 0,                              +
-         "num_reltuples": 0,                              +
-         "num_replica_chunks": 0,                         +
-         "num_replicated_distributed_hypertables": 0      +
      }                                                    +
  }
 (1 row)
