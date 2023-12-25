@@ -59,7 +59,7 @@ typedef struct CompressColInfo
 	List *coldeflist; /*list of ColumnDef for the compressed column */
 } CompressColInfo;
 
-static void compresscolinfo_init(CompressColInfo *cc, Oid srctbl_relid, List *segmentby_cols,
+static void compresscolinfo_init(CompressColInfo *cc, Oid src_relid, List *segmentby_cols,
 								 List *orderby_cols);
 static void compresscolinfo_init_singlecolumn(CompressColInfo *cc, const char *colname, Oid typid);
 
@@ -162,32 +162,16 @@ compresscolinfo_add_metadata_columns(CompressColInfo *cc)
 	}
 }
 
-/*
- * return the columndef list for compressed hypertable.
- * we do this by getting the source hypertable's attrs,
- * 1.  validate the segmentby cols and orderby cols exists in this list and
- * 2. create the columndefs for the new compressed hypertable
- *     segmentby_cols have same datatype as the original table
- *     all other cols have COMPRESSEDDATA_TYPE type
- */
 static void
-compresscolinfo_init(CompressColInfo *cc, Oid srctbl_relid, List *segmentby_cols,
-					 List *orderby_cols)
+check_segmentby(Oid relid, List *segmentby_cols)
 {
-	Relation rel;
-	TupleDesc tupdesc;
-	int colno, attno;
 	ListCell *lc;
-	cc->compresseddata_oid = ts_custom_type_cache_get(CUSTOM_TYPE_COMPRESSED_DATA)->type_oid;
-
-	rel = table_open(srctbl_relid, AccessShareLock);
-	tupdesc = rel->rd_att;
 	ArrayType *segmentby = NULL;
 
 	foreach (lc, segmentby_cols)
 	{
 		CompressedParsedCol *col = (CompressedParsedCol *) lfirst(lc);
-		AttrNumber col_attno = get_attnum(rel->rd_id, NameStr(col->colname));
+		AttrNumber col_attno = get_attnum(relid, NameStr(col->colname));
 		if (col_attno == InvalidAttrNumber)
 		{
 			ereport(ERROR,
@@ -197,7 +181,7 @@ compresscolinfo_init(CompressColInfo *cc, Oid srctbl_relid, List *segmentby_cols
 							 "column.")));
 		}
 
-		const char *col_attname = get_attname(rel->rd_id, col_attno, false);
+		const char *col_attname = get_attname(relid, col_attno, false);
 
 		/* check if segmentby columns are distinct. */
 		if (ts_array_is_member(segmentby, col_attname))
@@ -208,16 +192,18 @@ compresscolinfo_init(CompressColInfo *cc, Oid srctbl_relid, List *segmentby_cols
 							 "column.")));
 		segmentby = ts_array_add_element_text(segmentby, col_attname);
 	}
-	/* the column indexes are numbered as seg_attnolen + <orderby_index>
-	 */
+}
+
+static void
+check_orderby(Oid relid, List *orderby_cols, ArrayType *segmentby)
+{
 	ArrayType *orderby = NULL;
-	ArrayType *orderby_desc = NULL;
-	ArrayType *orderby_nullsfirst = NULL;
+	ListCell *lc;
 
 	foreach (lc, orderby_cols)
 	{
 		CompressedParsedCol *col = (CompressedParsedCol *) lfirst(lc);
-		AttrNumber col_attno = get_attnum(rel->rd_id, NameStr(col->colname));
+		AttrNumber col_attno = get_attnum(relid, NameStr(col->colname));
 
 		if (col_attno == InvalidAttrNumber)
 			ereport(ERROR,
@@ -226,7 +212,7 @@ compresscolinfo_init(CompressColInfo *cc, Oid srctbl_relid, List *segmentby_cols
 					 errhint("The timescaledb.compress_orderby option must reference a valid "
 							 "column.")));
 
-		const char *col_attname = get_attname(rel->rd_id, col_attno, false);
+		const char *col_attname = get_attname(relid, col_attno, false);
 
 		/* check if orderby columns are distinct. */
 		if (ts_array_is_member(orderby, col_attname))
@@ -246,14 +232,33 @@ compresscolinfo_init(CompressColInfo *cc, Oid srctbl_relid, List *segmentby_cols
 							 " timescaledb.compress_segmentby options.")));
 
 		orderby = ts_array_add_element_text(orderby, col_attname);
-		orderby_desc = ts_array_add_element_bool(orderby_desc, !col->asc);
-		orderby_nullsfirst = ts_array_add_element_bool(orderby_nullsfirst, col->nullsfirst);
 	}
+}
 
-	cc->numcols = 0;
+/*
+ * return the columndef list for compressed hypertable.
+ * we do this by getting the source hypertable's attrs,
+ * 1.  validate the segmentby cols and orderby cols exists in this list and
+ * 2. create the columndefs for the new compressed hypertable
+ *     segmentby_cols have same datatype as the original table
+ *     all other cols have COMPRESSEDDATA_TYPE type
+ */
+static void
+compresscolinfo_init(CompressColInfo *cc, Oid src_relid, List *segmentby_cols, List *orderby_cols)
+{
+	cc->compresseddata_oid = ts_custom_type_cache_get(CUSTOM_TYPE_COMPRESSED_DATA)->type_oid;
+
+	ArrayType *segmentby = cc->settings->fd.segmentby;
+	ArrayType *orderby = cc->settings->fd.orderby;
+
+	check_segmentby(src_relid, segmentby_cols);
+	check_orderby(src_relid, orderby_cols, segmentby);
+
+	Relation rel = table_open(src_relid, AccessShareLock);
+	TupleDesc tupdesc = rel->rd_att;
+
 	cc->coldeflist = NIL;
-	colno = 0;
-	for (attno = 0; attno < tupdesc->natts; attno++)
+	for (int attno = 0; attno < tupdesc->natts; attno++)
 	{
 		Oid attroid = InvalidOid;
 		int32 typmod = -1;
@@ -288,16 +293,8 @@ compresscolinfo_init(CompressColInfo *cc, Oid srctbl_relid, List *segmentby_cols
 		}
 		coldef = makeColumnDef(NameStr(attr->attname), attroid, typmod, collid);
 		cc->coldeflist = lappend(cc->coldeflist, coldef);
-		colno++;
 	}
-	cc->numcols = colno;
-
-	cc->settings->fd.segmentby = segmentby;
-	cc->settings->fd.orderby = orderby;
-	cc->settings->fd.orderby_desc = orderby_desc;
-	cc->settings->fd.orderby_nullsfirst = orderby_nullsfirst;
-
-	ts_compression_settings_update(cc->settings);
+	cc->numcols = list_length(cc->coldeflist);
 
 	table_close(rel, AccessShareLock);
 }
@@ -1123,6 +1120,12 @@ tsl_process_compress_table(AlterTableCmd *cmd, Hypertable *ht,
 		check_modify_compression_options(ht, settings, with_clause_options, orderby_cols);
 
 	compress_cols.settings = settings;
+
+	compression_settings_update(compress_cols.settings,
+								with_clause_options,
+								segmentby_cols,
+								orderby_cols);
+
 	compresscolinfo_init(&compress_cols, ht->main_table_relid, segmentby_cols, orderby_cols);
 
 	/* take explicit locks on catalog tables and keep them till end of txn */
@@ -1133,11 +1136,6 @@ tsl_process_compress_table(AlterTableCmd *cmd, Hypertable *ht,
 		/* compression is enabled */
 		drop_existing_compression_table(ht);
 	}
-
-	compression_settings_update(compress_cols.settings,
-								with_clause_options,
-								segmentby_cols,
-								orderby_cols);
 
 	/* Check if we can create a compressed hypertable with existing
 	 * constraints and indexes. */
@@ -1169,8 +1167,6 @@ static void
 compression_settings_update(CompressionSettings *settings, WithClauseResult *with_clause_options,
 							List *segmentby_cols, List *orderby_cols)
 {
-	bool need_update = false;
-
 	/* orderby arrays should always be in sync either all NULL or none */
 	Assert(
 		(settings->fd.orderby && settings->fd.orderby_desc && settings->fd.orderby_nullsfirst) ||
@@ -1195,7 +1191,6 @@ compression_settings_update(CompressionSettings *settings, WithClauseResult *wit
 		{
 			settings->fd.segmentby = NULL;
 		}
-		need_update = true;
 	}
 
 	if (!with_clause_options[CompressOrderBy].is_default)
@@ -1241,7 +1236,6 @@ compression_settings_update(CompressionSettings *settings, WithClauseResult *wit
 			settings->fd.orderby_desc = NULL;
 			settings->fd.orderby_nullsfirst = NULL;
 		}
-		need_update = true;
 	}
 	else if (orderby_cols && !settings->fd.orderby)
 	{
@@ -1275,14 +1269,9 @@ compression_settings_update(CompressionSettings *settings, WithClauseResult *wit
 														  1,
 														  true,
 														  TYPALIGN_CHAR);
-		need_update = true;
 	}
 
 	ts_compression_settings_update(settings);
-	if (need_update)
-	{
-		ts_compression_settings_update(settings);
-	}
 }
 
 /* Add a column to a table that has compression enabled
