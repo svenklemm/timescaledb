@@ -30,6 +30,7 @@ jobs:
             approvals=$(gh pr view $PR_NUMBER --json reviews --jq '[.reviews.[] | select(.authorAssociation == "MEMBER" and .state == "APPROVED")] | length')
 
             gh pr view $PR_NUMBER --json reviews --jq '[.reviews.[] | select(.authorAssociation == "MEMBER" and .state == "APPROVED")]'
+            gh pr view $PR_NUMBER --json latestReviews --jq '[.latestReviews.[] | select(.authorAssociation == "MEMBER" and .state == "APPROVED")]'
 
             if [[ $approvals -lt 2 ]] && [[ "${files}" ]] ; then
               echo "This pull request requires 2 approvals before merging."
